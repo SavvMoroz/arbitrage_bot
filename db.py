@@ -35,6 +35,15 @@ async def connect_to_db():
     )
 
 
+async def create_pool():
+    return await asyncpg.create_pool(
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        database=os.getenv('DB_NAME'),
+        host=os.getenv('DB_HOST'),
+    )
+
+
 async def upsert_data(pool, data):
     query = """
     INSERT INTO prices (pair, exchange, bid, ask)
@@ -46,15 +55,13 @@ async def upsert_data(pool, data):
     """
 
     async with pool.acquire() as connection:
-        async with connection.transaction():
-            for item in data:
-                await connection.execute(
-                    query,
-                    item["pair"],
-                    item["exchange"],
-                    item["bids"],
-                    item["asks"],
-                )
+        await connection.execute(
+            query,
+            data["pair"],
+            data["exchange"],
+            data["bids"],
+            data["asks"],
+        )
 
 
 async def main_db(data):
