@@ -14,5 +14,9 @@ CURRENCIES = [
     "ADA/USDT",
     "BNB/USDT",
     "LTC/USDT",
-    "PEPE/USDT"
+    "PEPE/USDT",
+    "TRON/USDT",
+    "SOL/USDT",
+    "DOT/USDT",
+    "MATIC/USDT"
 ]

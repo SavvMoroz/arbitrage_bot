@@ -1,3 +1,4 @@
+import logging
 import asyncpg
 import asyncio
 import os
@@ -62,6 +63,47 @@ async def upsert_data(pool, data):
             data["bids"],
             data["asks"],
         )
+
+
+async def find_arbitrage_opportunities(pool, queue, min_percent: float, max_percent: float):
+    async with pool.acquire() as connection:
+        async with connection.transaction():
+            query = """
+            WITH Arbitrage AS (
+            SELECT p1.pair,
+                   p1.exchange AS buy_exchange,
+                   p1.ask AS buy_price,
+                   p2.exchange AS sell_exchange,
+                   p2.bid AS sell_price,
+                   p2.bid - p1.ask AS profit,
+                   ((p2.bid - p1.ask) / p1.ask) * 100 AS profit_percent
+            FROM prices p1
+            JOIN prices p2 ON p1.pair = p2.pair AND p1.exchange <> p2.exchange
+            WHERE p2.bid > p1.ask
+            )
+            SELECT *
+            FROM Arbitrage
+            WHERE profit_percent BETWEEN $1 AND $2
+            ORDER BY profit_percent DESC;
+            """
+
+            rows = await connection.fetch(query, min_percent, max_percent)
+
+            # print(rows)
+
+            for row in rows:
+                opportunity = {
+                    "pair": row["pair"],
+                    "exchange_ask": row["buy_exchange"],
+                    "ask": row["buy_price"],
+                    "exchange_bid": row["sell_exchange"],
+                    "bid": row["sell_price"],
+                    "spread_percent": (row["sell_price"] - row["buy_price"]) / row["buy_price"] * 100
+                }
+
+                await queue.put(opportunity)
+                # print(opportunity)
+                # logging.info(f"arbitrage: {opportunity}")
 
 
 async def main_db(data):
